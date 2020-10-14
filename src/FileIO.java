@@ -3,11 +3,11 @@ import java.util.Scanner;
 
 public class FileIO {
 
-    public static void write(String fileName, StringBuilder content) {
+    public static void write(String fileName, String content) {
         BufferedWriter out;
         try {
             out = new BufferedWriter(new FileWriter(fileName));
-            out.write(content.toString());
+            out.write(content);
             out.close();
         } catch (IOException e) {
             System.out.println("Error! Could not write to file " + fileName);

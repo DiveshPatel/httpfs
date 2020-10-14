@@ -7,16 +7,14 @@ import java.nio.file.Paths;
 
 public class httpfs {
     public static void main(String[] args) {
-
         boolean v = false;
         int p = 8080;
         String d = Paths.get(".").toAbsolutePath().normalize().toString(); // get current working directory
-        String s = "C:\\Users\\dives\\Workspace\\httpfs\\src";
 
         // check if user needs any help
         try {
-            for(int i=0; i < args.length; ++i) {
-                if(args[i].contains("help")) {
+            for (String arg : args) {
+                if (arg.contains("help")) {
                     Info.help();
                     System.exit(0);
                 }
@@ -61,58 +59,49 @@ public class httpfs {
             System.out.println("Connected established with " +  clientSocket.toString());
 
             BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            PrintWriter out = new PrintWriter(clientSocket.getOutputStream());
+            PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
 
             boolean isRequestGet = false;
 
-            int red = -1;
+            int read = -1;
             byte[] buffer = new byte[5*1024];
-            byte[] redData;
+            byte[] readData;
             StringBuilder request = new StringBuilder();
-            String redDataText;
-            while ((red = clientSocket.getInputStream().read(buffer)) > -1) {
-                redData = new byte[red];
-                System.arraycopy(buffer, 0, redData, 0, red);
-                redDataText = new String(redData,"UTF-8");
-                request.append(redDataText);
+            String readDataText;
+
+            try {
+                while ((read = clientSocket.getInputStream().read(buffer)) >= 0) {
+                    readData = new byte[read];
+                    System.arraycopy(buffer, 0, readData, 0, read);
+                    readDataText = new String(readData,"UTF-8");
+                    request.append(readDataText);
+
+                    if(readDataText.contains("GET")) {
+                        isRequestGet = true;
+                        break;
+                    }
+                    else if(readDataText.contains("\r\n\r\n")) {
+                        break;
+                    }
+                    else {
+                        out.println(HttpResponseCodes.BAD_REQUEST.getResponse(""));
+                        out.flush();
+                        out.close();
+                        System.exit(0);
+                    }
+                }
+            } catch (IOException e) {
+                out.println(HttpResponseCodes.INTERNAL_SERVER_ERROR.getResponse(""));
+                out.flush();
+                out.close();
+                System.exit(0);
             }
-
-            System.out.println("BORKE");
-
-//            StringBuilder request = new StringBuilder();
-//            String inputLine = in.readLine();
-//            request.append(inputLine + "\r\n");
-//            boolean isRequestGet = false;
-//            if(inputLine.contains("GET")) {
-//                isRequestGet = true;
-//            }
-//            else if(inputLine.contains("POST")) {
-//                isRequestGet = false;
-//            }
-//            else
-//            {
-//                System.out.println("400 Bad Request");
-//                Info.help();
-//                System.exit(0);
-//            }
-//
-//            if(!isRequestGet) {
-//                while ((inputLine = in.readLine()) != null) {
-//                    request.append(inputLine + "\r\n");
-//                    if (inputLine.contains("Content-Length"))
-//                        break;
-//                }
-//            }
-            in.close();
 
             String[] requestData = request.toString().split("\r\n");
             String[] methodPathData = requestData[0].split(" ");
-
-            System.out.println(request);
-
             String userSpecifiedDir = d + Paths.get(methodPathData[1]).normalize().toString(); // Append d for secure access
             if(methodPathData[1].contains("..")) { // Secure access
-                out.println("HTTP/1.0 403 FORBIDDEN \r\n\r\n Attempted to connect to root directory");
+                out.println(HttpResponseCodes.FORBIDDEN.getResponse(""));
                 out.flush();
                 out.close();
                 System.exit(0);
@@ -120,24 +109,42 @@ public class httpfs {
 
             File file = new File(userSpecifiedDir);
             Path path = file.toPath();
+
+            String body = "";
             if(isRequestGet) {
                 if(Files.isDirectory(path)) {
-                    out.print("There are " + file.listFiles().length + " in the directory \r\n");
-                    out.flush();
-                    out.close();
-                    System.out.println(file.listFiles().length);
+                    body = "There are " + file.listFiles().length + " in the directory.";
                 }
                 else if (Files.isRegularFile(path)) {
-                    System.out.println(FileIO.read(userSpecifiedDir));
+                    body = FileIO.read(userSpecifiedDir);
+                }
+                else {
+                    out.println(HttpResponseCodes.NOT_FOUND.getResponse(""));
+                    out.flush();
+                    out.close();
+                    System.exit(0);
                 }
             }
             else {
                 if(!Files.isDirectory(path)) {
-                    //FileIO.write();
+                    String data = request.substring(request.indexOf(("\r\n\r\n"))).trim();
+                    FileIO.write(userSpecifiedDir, data);
+                }
+                else {
+                    out.println(HttpResponseCodes.FORBIDDEN.getResponse(""));
+                    out.flush();
+                    out.close();
+                    System.exit(0);
                 }
             }
 
-        } catch (IOException e) {
+            out.println(HttpResponseCodes.OK.getResponse(body));
+            in.close();
+            out.flush();
+            out.close();
+
+        }
+        catch (IOException e) {
             System.out.println("Error creating server socket, please verify that port number is valid");
             System.exit(0);
         }
