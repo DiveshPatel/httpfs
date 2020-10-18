@@ -3,16 +3,13 @@ import java.util.Scanner;
 
 public class FileIO {
 
-    public static void write(String fileName, String content) {
+    public static void write(String fileName, String content) throws IOException {
+        File file = new File(fileName);
+        file.getParentFile().mkdirs();
         BufferedWriter out;
-        try {
-            out = new BufferedWriter(new FileWriter(fileName));
-            out.write(content);
-            out.close();
-        } catch (IOException e) {
-            System.out.println("Error! Could not write to file " + fileName);
-            System.exit(0);
-        }
+        out = new BufferedWriter(new FileWriter(fileName));
+        out.write(content);
+        out.close();
     }
 
     public static String read(String fileName) {
