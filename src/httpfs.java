@@ -4,6 +4,7 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 
 public class httpfs {
     public static void main(String[] args) {
@@ -39,10 +40,14 @@ public class httpfs {
                         d = Paths.get(args[i + 1]).toAbsolutePath().normalize().toString();
                         if(Files.notExists(Paths.get(d))) {
                             File file = new File(d);
-                            file.mkdir();
+                            file.mkdirs();
                             System.out.println("New directory created at " + d);
                         }
                         break;
+                    default:
+                        if(!(args[i-1].equals("-p") || args[i-1].equals("-d"))) {
+                            throw new Exception();
+                        }
                 }
             }
         } catch (Exception e) {
@@ -53,6 +58,7 @@ public class httpfs {
 
         // Create the server socket
         try {
+            System.out.println("Working directory: " + d);
             ServerSocket serverSocket = new ServerSocket(p);
             System.out.println("Listening on port " + p);
             Socket clientSocket = serverSocket.accept();
@@ -84,65 +90,74 @@ public class httpfs {
                         break;
                     }
                     else {
-                        out.println(HttpResponseCodes.BAD_REQUEST.getResponse(""));
-                        out.flush();
-                        out.close();
+                        HttpResponseCodes.BAD_REQUEST.printResponse("", out, v);
                         System.exit(0);
                     }
                 }
             } catch (IOException e) {
-                out.println(HttpResponseCodes.INTERNAL_SERVER_ERROR.getResponse(""));
-                out.flush();
-                out.close();
+                HttpResponseCodes.INTERNAL_SERVER_ERROR.printResponse("", out, v);
                 System.exit(0);
+            }
+
+            if(v) {
+                System.out.println("Client Request: " + request.toString());
             }
 
             String[] requestData = request.toString().split("\r\n");
             String[] methodPathData = requestData[0].split(" ");
-            String userSpecifiedDir = d + Paths.get(methodPathData[1]).normalize().toString(); // Append d for secure access
             if(methodPathData[1].contains("..")) { // Secure access
-                out.println(HttpResponseCodes.FORBIDDEN.getResponse(""));
-                out.flush();
-                out.close();
+                HttpResponseCodes.FORBIDDEN.printResponse("", out, v);
                 System.exit(0);
             }
 
+
+            String userSpecifiedDir = d + Paths.get(methodPathData[1]).normalize().toString(); // Append d for secure access
             File file = new File(userSpecifiedDir);
             Path path = file.toPath();
 
             String body = "";
             if(isRequestGet) {
+                if(v) {
+                    System.out.println("Performing GET Request: " + userSpecifiedDir);
+                }
                 if(Files.isDirectory(path)) {
-                    body = "There are " + file.listFiles().length + " in the directory.";
+                    ArrayList<String> fileList = new ArrayList<>();
+                    for(File f: file.listFiles()) {
+                        if (f.isDirectory()) {
+                            fileList.add(f.getName() + "/");
+                        }
+                        else {
+                            fileList.add(f.getName());
+                        }
+                    }
+                    body = fileList.toString().isEmpty()? "No Files Found" : "Files: " + fileList.toString();
                 }
                 else if (Files.isRegularFile(path)) {
                     body = FileIO.read(userSpecifiedDir);
                 }
                 else {
-                    out.println(HttpResponseCodes.NOT_FOUND.getResponse(""));
-                    out.flush();
-                    out.close();
+                    HttpResponseCodes.NOT_FOUND.printResponse("", out, v);
                     System.exit(0);
                 }
             }
             else {
+                if(v) {
+                    System.out.println("Performing POST Request: " + userSpecifiedDir);
+                }
                 if(!Files.isDirectory(path)) {
                     String data = request.substring(request.indexOf(("\r\n\r\n"))).trim();
                     FileIO.write(userSpecifiedDir, data);
+                    if(v)
+                        System.out.println("With Data: " + data);
                 }
                 else {
-                    out.println(HttpResponseCodes.FORBIDDEN.getResponse(""));
-                    out.flush();
-                    out.close();
+                    HttpResponseCodes.FORBIDDEN.printResponse("", out, v);
                     System.exit(0);
                 }
             }
 
-            out.println(HttpResponseCodes.OK.getResponse(body));
+            HttpResponseCodes.OK.printResponse(body, out, v);
             in.close();
-            out.flush();
-            out.close();
-
         }
         catch (IOException e) {
             System.out.println("Error creating server socket, please verify that port number is valid");

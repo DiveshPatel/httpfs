@@ -1,3 +1,4 @@
+import java.io.PrintWriter;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -29,7 +30,7 @@ public enum HttpResponseCodes {
 //    Content-Type: text/html
 //    Connection: Closed
 
-    public String getResponse(String body) {
+    public void printResponse(String body, PrintWriter out, boolean v) {
         StringBuilder sb = new StringBuilder();
         sb.append(toString() + "\r\n");
         DateFormat df = new SimpleDateFormat("EE, dd MMM yyyy HH:mm:ss z", Locale.CANADA);
@@ -42,6 +43,13 @@ public enum HttpResponseCodes {
         if(!body.isEmpty()) {
             sb.append(body);
         }
-        return sb.toString();
+        out.println(sb.toString());
+        out.flush();
+        out.close();
+
+        if(v) {
+            System.out.println("Sending HTTP Response code: ");
+            System.out.println(sb.toString());
+        }
     }
 }

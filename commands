@@ -1,0 +1,9 @@
+Commands for httpfs:
+(httpfs -d -p -v)
+httpfs -d D:\workspace\httpfs\src\dir1\dir2
+httpfs -d D:\workspace\httpfs\test\dir1\ -p 9000
+
+Commands for cURL:
+post http://localhost:8080/src/
+get -v http://localhost:8080/src/
+get -v http://localhost:8080/
